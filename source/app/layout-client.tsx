@@ -90,12 +90,12 @@ export default function RootLayoutClient({
         },
         // Auto-create an embedded wallet for users who sign in via
         // email/google so they always end up with a usable address.
-        // Use the flat `createOnLogin` shape — the nested
-        // `embeddedWallets.ethereum.createOnLogin` API is from a newer
-        // Privy SDK and isn't honored by 3.22.x, which can leave the
-        // provider in a broken state and break wallet login too.
+        // The installed Privy SDK requires the nested
+        // `embeddedWallets.ethereum.createOnLogin` shape.
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
         },
         // `defaultChain` tells Privy which network to spin embedded
         // wallets up on. We intentionally do NOT pass `supportedChains`
