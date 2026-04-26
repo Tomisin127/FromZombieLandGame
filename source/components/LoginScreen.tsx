@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Crosshair, Skull, Target } from 'lucide-react'
 
 interface LoginScreenProps {
@@ -12,10 +12,28 @@ const bodyFont = { fontFamily: 'var(--font-body)' }
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
 
   const handleLogin = async () => {
     setIsLoading(true)
-    onLogin()
+    try {
+      await onLogin()
+    } catch (err) {
+      console.log('[v0] Login error:', err)
+    }
+    // If the user closes the Privy modal without authenticating,
+    // `login()` resolves but the page stays on the login screen.
+    // Without this fallback, the button stays stuck on "CONNECTING..."
+    // and the user can't try again. Re-enable after a short delay so
+    // the modal-close path doesn't trap them.
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => setIsLoading(false), 1500)
   }
 
   return (
