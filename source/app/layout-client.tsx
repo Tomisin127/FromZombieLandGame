@@ -85,7 +85,9 @@ export default function RootLayoutClient({
         // Auto-create an embedded wallet for users who sign in without
         // one so they always end up authenticated with a usable address.
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
         },
         // Match the chain we mint on so signed transactions don't get
         // rejected for being on the wrong network.
