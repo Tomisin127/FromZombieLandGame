@@ -92,7 +92,16 @@ export default function RootLayoutClient({
         // email/google so they always end up with a usable address.
         // The installed Privy SDK requires the nested
         // `embeddedWallets.ethereum.createOnLogin` shape.
+        // `showWalletUIs: false` is the critical bit for the game:
+        // it makes EVERY transaction sent from the embedded wallet
+        // silent — no Privy modal, no per-tx confirmation prompt —
+        // which is what allows the kill-to-mint flow to feel
+        // instantaneous and run entirely in the background.
+        // (External wallets like MetaMask/Coinbase still show their
+        // own native confirmation; that's a wallet security feature
+        // and cannot be bypassed by Privy.)
         embeddedWallets: {
+          showWalletUIs: false,
           ethereum: {
             createOnLogin: 'users-without-wallets',
           },
