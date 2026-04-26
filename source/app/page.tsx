@@ -18,10 +18,20 @@ export default function Home() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const movementRef = useRef<JoystickVector>({ x: 0, y: 0 })
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Sync fullscreen state with the browser's actual fullscreen element so
+  // the wrapper expands/contracts whether fullscreen was triggered by a
+  // button or escaped via the Esc key.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
   }, [])
 
   const handleKill = async (newKillCount: number) => {
@@ -66,7 +76,13 @@ export default function Home() {
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden">
-      <div className="relative w-full h-full mx-auto max-w-md bg-black">
+      {/* In fullscreen, drop the mobile-portrait max-w so the game fills
+          the entire screen on tablets/desktops. */}
+      <div
+        className={`relative w-full h-full mx-auto bg-black ${
+          isFullscreen ? '' : 'max-w-md'
+        }`}
+      >
         {/* Game Canvas - fills entire container */}
         <div className="absolute inset-0">
           <GameContainer

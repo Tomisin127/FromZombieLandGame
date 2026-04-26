@@ -16,11 +16,6 @@ const STORAGE_KEY = 'zombie-fps-minting-key'
 const BUILDER_CODE = 'bc_dh0rqw67'
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] })
 
-// Gas limit used for every mint — some NFT contracts on Base require headroom
-// for metadata/royalty/ERC-4906 updates, so we bump this well above a typical
-// mint's baseline to avoid out-of-gas failures.
-const MINT_GAS_LIMIT = 3_000_000n
-
 // Public client to read chain data
 const publicClient = createPublicClient({
   chain: base,
@@ -108,52 +103,146 @@ export function useMintingWallet() {
           dataSuffix: DATA_SUFFIX,
         })
 
-        // Try mint(address to) first with the configured function name
-        let hash: `0x${string}`
-        try {
-          hash = await walletClient.writeContract({
-            address: NFT_CONTRACT_ADDRESS as `0x${string}`,
-            abi: [
-              {
-                name: mintFunction,
-                type: 'function',
-                stateMutability: 'payable',
-                inputs: [{ name: 'to', type: 'address' }],
-                outputs: [{ name: '', type: 'uint256' }],
-              },
-            ],
+        const to = recipientAddress as `0x${string}`
+
+        // Try multiple common mint signatures, in preference order. We try
+        // the user's configured function name first (default `mint`) with
+        // an `address` arg, then fall back to other shapes. This matches
+        // the Privy path and lets the wallet recover if the contract uses
+        // a different signature than the configured one.
+        const variants: Array<{
+          name: string
+          abi: any
+          functionName: string
+          args: any[]
+        }> = [
+          {
+            name: `${mintFunction}(address)`,
+            abi: [{
+              name: mintFunction,
+              type: 'function',
+              stateMutability: 'payable',
+              inputs: [{ name: 'to', type: 'address' }],
+              outputs: [],
+            }],
             functionName: mintFunction,
-            args: [recipientAddress as `0x${string}`],
-            gas: MINT_GAS_LIMIT,
-          })
-        } catch (firstErr: any) {
-          // Try with quantity 1 (mint(address, uint256))
-          console.log('[v0] First mint attempt failed, trying with quantity', firstErr?.shortMessage || firstErr?.message)
-          hash = await walletClient.writeContract({
-            address: NFT_CONTRACT_ADDRESS as `0x${string}`,
-            abi: [
-              {
-                name: 'mint',
-                type: 'function',
-                stateMutability: 'payable',
-                inputs: [
-                  { name: 'to', type: 'address' },
-                  { name: 'quantity', type: 'uint256' },
-                ],
-                outputs: [],
-              },
-            ],
+            args: [to],
+          },
+          {
+            name: 'mint()',
+            abi: [{
+              name: 'mint',
+              type: 'function',
+              stateMutability: 'payable',
+              inputs: [],
+              outputs: [],
+            }],
             functionName: 'mint',
-            args: [recipientAddress as `0x${string}`, 1n],
-            gas: MINT_GAS_LIMIT,
-          })
+            args: [],
+          },
+          {
+            name: 'mint(uint256)',
+            abi: [{
+              name: 'mint',
+              type: 'function',
+              stateMutability: 'payable',
+              inputs: [{ name: 'quantity', type: 'uint256' }],
+              outputs: [],
+            }],
+            functionName: 'mint',
+            args: [1n],
+          },
+          {
+            name: 'mint(address,uint256)',
+            abi: [{
+              name: 'mint',
+              type: 'function',
+              stateMutability: 'payable',
+              inputs: [
+                { name: 'to', type: 'address' },
+                { name: 'quantity', type: 'uint256' },
+              ],
+              outputs: [],
+            }],
+            functionName: 'mint',
+            args: [to, 1n],
+          },
+          {
+            name: 'safeMint(address)',
+            abi: [{
+              name: 'safeMint',
+              type: 'function',
+              stateMutability: 'payable',
+              inputs: [{ name: 'to', type: 'address' }],
+              outputs: [],
+            }],
+            functionName: 'safeMint',
+            args: [to],
+          },
+        ]
+
+        let lastError: any = null
+        for (const v of variants) {
+          try {
+            // Estimate gas dynamically. Hard-coding a huge gas ceiling
+            // (e.g. 3M) makes viem reject the tx with
+            // "total cost (gas * gas fee + value) of e..." whenever the
+            // wallet's balance is below worst-case gas, even though the
+            // mint itself only needs ~150–300k gas. Estimating instead
+            // lets the tx through on a small balance.
+            let gas: bigint
+            try {
+              gas = await publicClient.estimateContractGas({
+                account,
+                address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+                abi: v.abi,
+                functionName: v.functionName,
+                args: v.args,
+              })
+              // 30% safety buffer
+              gas = (gas * 130n) / 100n
+            } catch (estErr: any) {
+              // If estimation reverts, this variant is wrong for this
+              // contract — skip to the next one without burning gas.
+              console.log(`[v0] Estimate failed for ${v.name}:`, estErr?.shortMessage || estErr?.message)
+              lastError = estErr
+              continue
+            }
+
+            const hash = await walletClient.writeContract({
+              address: NFT_CONTRACT_ADDRESS as `0x${string}`,
+              abi: v.abi,
+              functionName: v.functionName,
+              args: v.args,
+              gas,
+            })
+
+            console.log(`[v0] Mint succeeded with ${v.name}:`, hash)
+            // Refresh balance in background
+            refreshBalance()
+            return { success: true, hash }
+          } catch (err: any) {
+            const msg = err?.shortMessage || err?.message || ''
+            console.log(`[v0] Mint variant ${v.name} send failed:`, msg)
+            lastError = err
+            // If the wallet truly can't cover gas, no other variant will
+            // help — bail out with a clearer message.
+            if (/insufficient funds|total cost/i.test(msg)) {
+              return {
+                success: false,
+                error: 'Insufficient ETH in minting wallet — fund it on Base to continue tagging.',
+              }
+            }
+          }
         }
 
-        console.log('[v0] Mint transaction sent:', hash)
-        // Refresh balance in background
-        refreshBalance()
-
-        return { success: true, hash }
+        return {
+          success: false,
+          error:
+            lastError?.shortMessage ||
+            lastError?.message ||
+            'All mint variants failed',
+        }
       } catch (err: any) {
         console.error('[v0] Mint failed:', err)
         return {

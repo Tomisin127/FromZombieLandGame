@@ -33,8 +33,29 @@ export default function GameHUD({
   const [nftsMinted, setNftsMinted] = useState(0)
   const [dashboardOpen, setDashboardOpen] = useState(false)
   const [notices, setNotices] = useState<MintNotice[]>([])
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const processedKillsRef = useRef<Set<number>>(new Set())
   const noticeCounterRef = useRef(0)
+
+  // Track browser fullscreen state so the toggle button label stays
+  // accurate when the user presses Esc to exit.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.()
+      } else {
+        await document.exitFullscreen?.()
+      }
+    } catch (e) {
+      console.log('[v0] Fullscreen toggle failed:', e)
+    }
+  }
 
   // Auto-open dashboard on first load if not configured
   useEffect(() => {
@@ -183,6 +204,45 @@ export default function GameHUD({
               style={displayFont}
             >
               STASH
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-xs text-[#d6ccb2] tracking-[0.2em] hover:bg-[#2a231f] flex items-center gap-2"
+              style={displayFont}
+              aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
+            >
+              {isFullscreen ? (
+                // Exit fullscreen icon (inward arrows)
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                  aria-hidden="true"
+                >
+                  <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+                </svg>
+              ) : (
+                // Enter fullscreen icon (outward corners)
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="square"
+                  strokeLinejoin="miter"
+                  aria-hidden="true"
+                >
+                  <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+                </svg>
+              )}
+              {isFullscreen ? 'EXIT FS' : 'FULLSCREEN'}
             </button>
           </div>
         </div>
