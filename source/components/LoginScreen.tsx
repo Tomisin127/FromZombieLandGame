@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Crosshair, Skull, Target } from 'lucide-react'
+import { Crosshair, Skull, Target, Settings } from 'lucide-react'
+import MinterSettings from '@/components/MinterSettings'
 
 interface LoginScreenProps {
   onLogin: () => void
@@ -13,6 +14,7 @@ const bodyFont = { fontFamily: 'var(--font-body)' }
 
 export default function LoginScreen({ onLogin, error }: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -168,10 +170,23 @@ export default function LoginScreen({ onLogin, error }: LoginScreenProps) {
       <button
         onClick={handleLogin}
         disabled={isLoading}
-        className="w-56 py-4 px-8 border-2 border-[#a3b83d] bg-[#14100e] text-[#a3b83d] hover:bg-[#a3b83d] hover:text-[#14100e] disabled:opacity-50 disabled:cursor-not-allowed text-lg tracking-[0.25em] transition-colors mb-6"
+        className="w-56 py-4 px-8 border-2 border-[#a3b83d] bg-[#14100e] text-[#a3b83d] hover:bg-[#a3b83d] hover:text-[#14100e] disabled:opacity-50 disabled:cursor-not-allowed text-lg tracking-[0.25em] transition-colors mb-3"
         style={displayFont}
       >
         {isLoading ? 'CONNECTING...' : 'ENLIST'}
+      </button>
+
+      {/* Dashboard — opens the minter settings modal so the player can
+          choose between embedded wallet (silent), connected wallet
+          (signs each tx), or pasted private key (silent). The choice
+          persists in localStorage and is applied next time they mint. */}
+      <button
+        onClick={() => setSettingsOpen(true)}
+        className="w-56 py-3 px-8 border border-[#4a3f38] bg-transparent text-[#8a8270] hover:text-[#d6ccb2] hover:border-[#d6ccb2] text-xs tracking-[0.25em] transition-colors mb-6 flex items-center justify-center gap-2"
+        style={displayFont}
+      >
+        <Settings className="w-3.5 h-3.5" aria-hidden="true" />
+        DASHBOARD
       </button>
 
       {/* Footer */}
@@ -182,6 +197,11 @@ export default function LoginScreen({ onLogin, error }: LoginScreenProps) {
         Connect your Web3 wallet to join the fight. Email and Google sign-in
         are also available — a wallet will be created for you automatically.
       </p>
+
+      <MinterSettings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   )
 }

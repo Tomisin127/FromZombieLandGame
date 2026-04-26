@@ -65,6 +65,14 @@ export default function RootLayout({
       lang="en"
       className={`bg-[#12100e] ${blackOps.variable} ${specialElite.variable} ${geistMono.variable}`}
     >
+      <head>
+        {/* Explicit Base verification meta tag. Next.js renders the
+            same tag from `metadata.other` above, but Base's verifier
+            sometimes can't read tags injected by the framework — adding
+            it directly to <head> guarantees it shows up in the raw HTML
+            of every route. */}
+        <meta name="base:app_id" content="69ea74e2269d5b14147c9057" />
+      </head>
       <body className="font-sans antialiased bg-[#12100e] text-[#d6ccb2]">
         <RootLayoutClient>
           {children}

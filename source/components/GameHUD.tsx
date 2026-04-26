@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { usePrivyMint } from '@/hooks/usePrivyMint'
+import MinterSettings from '@/components/MinterSettings'
 
 interface GameHUDProps {
   kills: number
@@ -28,18 +30,31 @@ export default function GameHUD({
   walletAddress,
   onLogout,
 }: GameHUDProps) {
-  // Mint always runs through the user's Privy embedded wallet — even
-  // if they signed in by connecting MetaMask, Privy provisions a
-  // separate embedded wallet (createOnLogin:'all-users') that can sign
-  // silently with no popup. `embeddedAddress` is where the player
-  // funds gas; `balance` is the live ETH balance on Base.
-  const { mint, isAvailable, embeddedAddress, balance, balanceWei } =
-    usePrivyMint()
+  // The active mint mode is selected by the player on the dashboard
+  // (silent embedded / connected wallet / pasted private key). The
+  // hook resolves which address actually signs and pays gas.
+  const {
+    mint,
+    isAvailable,
+    activeMode,
+    activeAddress,
+    balance,
+    balanceWei,
+  } = usePrivyMint()
   const [nftsMinted, setNftsMinted] = useState(0)
   const [notices, setNotices] = useState<MintNotice[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const processedKillsRef = useRef<Set<number>>(new Set())
   const noticeCounterRef = useRef(0)
+
+  // Human-readable label for the MINTER badge based on active mode.
+  const modeLabel =
+    activeMode === 'connected'
+      ? 'CONNECTED · SIGNS EACH'
+      : activeMode === 'custom'
+        ? 'CUSTOM KEY · SILENT'
+        : 'EMBEDDED · SILENT'
 
   // Track browser fullscreen state so the toggle button label stays
   // accurate when the user presses Esc to exit.
@@ -151,14 +166,14 @@ export default function GameHUD({
               </p>
             </div>
 
-            {/* Minter — the silent embedded Privy wallet that signs
-                every mint and pays gas. The player needs to fund THIS
-                address (a few cents of Base ETH) for tagging to work.
-                Tap-to-copy so they can quickly send funds to it. */}
-            {embeddedAddress && (
+            {/* Minter — the wallet that signs and pays gas. Which one
+                is depends on the dashboard setting. Tap-to-copy the
+                address so the player can fund it (silent modes need
+                gas to be present in the address itself). */}
+            {activeAddress && (
               <button
                 onClick={() => {
-                  void navigator.clipboard?.writeText(embeddedAddress)
+                  void navigator.clipboard?.writeText(activeAddress)
                 }}
                 className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2 text-left hover:bg-[#1a1614] transition-colors"
                 style={{
@@ -171,13 +186,13 @@ export default function GameHUD({
                   className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#a3b83d]"
                   style={displayFont}
                 >
-                  MINTER · TAP TO COPY
+                  {modeLabel}
                 </p>
                 <p
                   className="text-xs text-[#d6ccb2]"
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
-                  {embeddedAddress.slice(0, 6)}...{embeddedAddress.slice(-4)}
+                  {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
                 </p>
                 <p
                   className="text-[10px] mt-1 tracking-[0.2em]"
@@ -236,6 +251,15 @@ export default function GameHUD({
                 </svg>
               )}
               {isFullscreen ? 'EXIT FS' : 'FULLSCREEN'}
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-xs text-[#d6ccb2] tracking-[0.2em] hover:bg-[#2a231f] flex items-center gap-2"
+              style={displayFont}
+              aria-label="Open minter settings"
+            >
+              <Settings className="w-3.5 h-3.5" aria-hidden="true" />
+              MINTER
             </button>
           </div>
         </div>
@@ -363,6 +387,14 @@ export default function GameHUD({
           </p>
         </div>
       )}
+
+      {/* Mid-game minter dashboard. Saving here updates localStorage,
+          which the mint hook polls and picks up automatically — so the
+          next kill uses the new mode without a reload. */}
+      <MinterSettings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </>
   )
 }
