@@ -9,14 +9,17 @@ import GameContainer from '@/components/GameContainer'
 import Joystick, { type JoystickVector } from '@/components/Joystick'
 
 export default function Home() {
-  const { user, login, logout } = usePrivy()
+  // `ready` flips to true once Privy finishes loading its SDK. Until
+  // then, `login()` is a no-op and `authenticated`/`user` are stale, so
+  // we MUST gate the UI on it — otherwise pressing ENLIST too early
+  // does nothing and the wallet never connects.
+  const { ready, authenticated, user, login, logout } = usePrivy()
   const [gameState, setGameState] = useState({
     kills: 0,
     difficulty: 0,
     gameOver: false,
     isPaused: false,
   })
-  const [isLoading, setIsLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const movementRef = useRef<JoystickVector>({ x: 0, y: 0 })
@@ -68,7 +71,22 @@ export default function Home() {
 
   if (!mounted) return null
 
-  if (!user) {
+  // Block UI until Privy SDK is ready — otherwise the login button does
+  // nothing because `login()` is queued behind SDK initialization.
+  if (!ready) {
+    return (
+      <div className="w-full h-screen bg-[#12100e] flex items-center justify-center">
+        <p
+          className="text-[#a3b83d] text-sm tracking-[0.4em]"
+          style={{ fontFamily: 'var(--font-display)' }}
+        >
+          ESTABLISHING UPLINK...
+        </p>
+      </div>
+    )
+  }
+
+  if (!authenticated || !user) {
     return <LoginScreen onLogin={login} />
   }
 
