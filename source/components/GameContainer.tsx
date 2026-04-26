@@ -117,7 +117,7 @@ function GameScene({
     zombieCounter: 0,
     isGameRunning: true,
     cameraAngle: 0,
-    cameraPitch: 0.35,
+    cameraPitch: 0, // 0 = horizontal aim; positive = aim up; negative = aim down
     cameraDistance: 6,
     lastTouchX: 0,
     lastTouchY: 0,
@@ -193,9 +193,11 @@ function GameScene({
       state.dragDistance += Math.abs(dx) + Math.abs(dy)
 
       state.cameraAngle -= dx * 0.008
+      // Drag up = aim up, drag down = aim down. Allow negative pitch so
+      // the player can aim freely on the Y axis (not just horizontally).
       state.cameraPitch = Math.max(
-        0.15,
-        Math.min(1.2, state.cameraPitch + dy * 0.005),
+        -1.3, // can aim well below the horizon
+        Math.min(1.3, state.cameraPitch - dy * 0.005),
       )
 
       state.lastTouchX = e.clientX
@@ -396,10 +398,16 @@ function GameScene({
       }
     }
 
-    // --- Camera: over-the-shoulder orbit ---
-    const cx = Math.sin(state.cameraAngle) * state.cameraDistance * Math.cos(state.cameraPitch)
-    const cz = Math.cos(state.cameraAngle) * state.cameraDistance * Math.cos(state.cameraPitch)
-    const cy = state.cameraDistance * Math.sin(state.cameraPitch) + 1.6
+    // --- Camera: over-the-shoulder, FREE Y-axis aim ---
+    // Camera POSITION stays at a stable shoulder height behind the player —
+    // the camera does NOT swing high above when you aim down, which would
+    // otherwise restrict vertical aim. AIM DIRECTION is driven by pitch.
+    const horizDist = state.cameraDistance * 0.85
+    const cx = Math.sin(state.cameraAngle) * horizDist
+    const cz = Math.cos(state.cameraAngle) * horizDist
+    // Slight pitch-driven height nudge for feel, but heavily clamped so
+    // it never breaks the over-the-shoulder framing.
+    const cy = 2.0 + Math.max(-0.4, Math.min(0.6, state.cameraPitch * 0.4))
 
     // Shift camera & lookAt by the shoulder offset so the crosshair sits past the player, not on him
     const shoulderX = rightX * SHOULDER_OFFSET
@@ -411,12 +419,16 @@ function GameScene({
       state.playerPos.z + cz + shoulderZ
     )
 
-    // Look ahead of the player so center-of-screen aims at the world, not the character
+    // Aim direction: yaw (cameraAngle) + pitch (cameraPitch).
+    // Look-at point can move freely on Y based on pitch so the crosshair
+    // (screen-center raycast) tracks targets vertically as well.
     const aimAhead = 6
+    const cosP = Math.cos(state.cameraPitch)
+    const sinP = Math.sin(state.cameraPitch)
     camera.lookAt(
-      state.playerPos.x + forwardX * aimAhead + shoulderX,
-      state.playerPos.y + 1.1,
-      state.playerPos.z + forwardZ * aimAhead + shoulderZ
+      state.playerPos.x + forwardX * aimAhead * cosP + shoulderX,
+      state.playerPos.y + 1.1 + sinP * aimAhead,
+      state.playerPos.z + forwardZ * aimAhead * cosP + shoulderZ
     )
 
     // Player position & rotation
