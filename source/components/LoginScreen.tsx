@@ -174,12 +174,17 @@ export default function LoginScreen({ onLogin, error }: LoginScreenProps) {
         {isLoading ? 'CONNECTING...' : 'ENLIST'}
       </button>
 
-      {/* Footer */}
+      {/* Footer — direct mobile users to the email path because mobile
+          wallet connect is unreliable (popups blocked, deep-links time
+          out over VPN, no injected wallet). */}
       <p
-        className="text-center text-[#8a8270] text-[11px] max-w-xs tracking-wider"
+        className="text-center text-[#8a8270] text-[11px] max-w-xs tracking-wider leading-relaxed"
         style={bodyFont}
       >
-        Connect your Web3 wallet to join the fight. No new wallet required.
+        On mobile? Pick <span className="text-[#a3b83d]">Email</span> or{' '}
+        <span className="text-[#a3b83d]">Google</span> in the next screen — a
+        wallet is created for you automatically. Wallet sign-in works best on
+        desktop.
       </p>
     </div>
   )
