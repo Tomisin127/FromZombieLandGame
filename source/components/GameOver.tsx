@@ -2,6 +2,11 @@
 
 interface GameOverProps {
   score: number
+  // Real count of successfully minted dog-tag NFTs this run, lifted
+  // from GameHUD via page.tsx. Replaces the old `score / 5` estimate
+  // which assumed mint-every-5th-kill — mints actually happen on
+  // every kill and not all of them necessarily succeed.
+  nftsMinted: number
   walletAddress: string
   onPlayAgain: () => void
   onLogout: () => void
@@ -12,11 +17,11 @@ const bodyFont = { fontFamily: 'var(--font-body)' }
 
 export default function GameOver({
   score,
+  nftsMinted,
   walletAddress,
   onPlayAgain,
   onLogout,
 }: GameOverProps) {
-  const nftsMinted = Math.floor(score / 5)
 
   return (
     <div className="absolute inset-0 bg-[#12100e]/95 backdrop-blur flex flex-col items-center justify-center p-4 z-50">

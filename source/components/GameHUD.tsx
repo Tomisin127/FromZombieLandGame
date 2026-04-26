@@ -11,6 +11,10 @@ interface GameHUDProps {
   walletAddress: string
   onLogout: () => void
   isPaused?: boolean
+  // Lifted from local state so GameOver can show the same real
+  // number of dog-tags minted this run.
+  nftsMinted: number
+  onMintSuccess: () => void
 }
 
 interface MintNotice {
@@ -29,6 +33,8 @@ export default function GameHUD({
   difficulty,
   walletAddress,
   onLogout,
+  nftsMinted,
+  onMintSuccess,
 }: GameHUDProps) {
   // The active mint mode is selected by the player on the dashboard
   // (silent embedded / connected wallet / pasted private key). The
@@ -41,7 +47,6 @@ export default function GameHUD({
     balance,
     balanceWei,
   } = usePrivyMint()
-  const [nftsMinted, setNftsMinted] = useState(0)
   const [notices, setNotices] = useState<MintNotice[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -114,7 +119,7 @@ export default function GameHUD({
     )
 
     if (result.success) {
-      setNftsMinted((prev) => prev + 1)
+      onMintSuccess()
     }
 
     setTimeout(() => {
