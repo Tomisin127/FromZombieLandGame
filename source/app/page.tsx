@@ -28,11 +28,23 @@ export default function Home() {
     onError: (error) => {
       console.log('[v0] Privy login error:', error)
       // Common values: 'exited_auth_flow', 'user_rejected_signature',
-      // 'generic_connect_wallet_error'. Map these to friendly text.
+      // 'generic_connect_wallet_error', 'cannot_link_more_of_same_type'.
+      // Map these to friendly text so the user knows what to do next.
       const msg = String(error)
-      if (/rejected|denied|exited|cancel/i.test(msg)) {
+      if (/popup/i.test(msg)) {
+        setLoginError(
+          'Your browser blocked the wallet popup. Use Email or Google sign-in instead — a wallet will be created for you automatically.',
+        )
+      } else if (/rejected|denied|exited|cancel/i.test(msg)) {
         setLoginError(
           'Sign-in cancelled. Your wallet connected, but you need to APPROVE the signature request to enter the game.',
+        )
+      } else if (/generic_connect_wallet|wallet|connector/i.test(msg)) {
+        // This covers the "Could not log in with wallet" case shown in
+        // the screenshot. On mobile this is almost always a popup /
+        // deep-link / VPN issue — push them to email/Google.
+        setLoginError(
+          'Could not log in with wallet. On mobile, wallet sign-in is unreliable — use Email or Google instead and a wallet will be created for you automatically.',
         )
       } else {
         setLoginError(`Sign-in failed: ${msg}`)
