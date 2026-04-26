@@ -5,12 +5,13 @@ import { Crosshair, Skull, Target } from 'lucide-react'
 
 interface LoginScreenProps {
   onLogin: () => void
+  error?: string | null
 }
 
 const displayFont = { fontFamily: 'var(--font-display)' }
 const bodyFont = { fontFamily: 'var(--font-body)' }
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, error }: LoginScreenProps) {
   const [isLoading, setIsLoading] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -139,6 +140,29 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </div>
         </div>
       </div>
+
+      {/* Surface auth failures (most often: user dismissed the SIWE
+          signature prompt after the wallet connected) so they know
+          they need to APPROVE the signature, not just connect. */}
+      {error && (
+        <div
+          className="border-2 border-[#7a1515] bg-[#3d0808] px-4 py-3 mb-4 max-w-xs w-full"
+          role="alert"
+        >
+          <p
+            className="text-[#d6ccb2] text-[10px] tracking-[0.3em] mb-1"
+            style={displayFont}
+          >
+            SIGN-IN INCOMPLETE
+          </p>
+          <p
+            className="text-[#d6ccb2] text-xs leading-relaxed"
+            style={bodyFont}
+          >
+            {error}
+          </p>
+        </div>
+      )}
 
       {/* Enlist button — flat stencil style, no gradient */}
       <button
