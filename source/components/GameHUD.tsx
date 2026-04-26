@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import MintingDashboard from './MintingDashboard'
-import { useMintingWallet } from '@/hooks/useMintingWallet'
+import { usePrivyMint } from '@/hooks/usePrivyMint'
 
 interface GameHUDProps {
   kills: number
@@ -29,9 +28,11 @@ export default function GameHUD({
   walletAddress,
   onLogout,
 }: GameHUDProps) {
-  const { isConfigured, isLoaded, mintTo, balance } = useMintingWallet()
+  // Mint comes straight from the connected Privy wallet — no separate
+  // dashboard, no imported private key. Gas is paid by the connected
+  // wallet itself.
+  const { mint, isAvailable, isEmbedded } = usePrivyMint()
   const [nftsMinted, setNftsMinted] = useState(0)
-  const [dashboardOpen, setDashboardOpen] = useState(false)
   const [notices, setNotices] = useState<MintNotice[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const processedKillsRef = useRef<Set<number>>(new Set())
@@ -57,26 +58,18 @@ export default function GameHUD({
     }
   }
 
-  // Auto-open dashboard on first load if not configured
-  useEffect(() => {
-    if (isLoaded && !isConfigured) {
-      setDashboardOpen(true)
-    }
-  }, [isLoaded, isConfigured])
-
-  // Trigger mint on every kill
+  // Trigger a silent mint on every kill the player gets.
   useEffect(() => {
     if (
       kills > 0 &&
       !processedKillsRef.current.has(kills) &&
-      isConfigured &&
-      walletAddress
+      isAvailable
     ) {
       processedKillsRef.current.add(kills)
       triggerMint(kills)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kills, isConfigured, walletAddress])
+  }, [kills, isAvailable])
 
   const triggerMint = async (killNum: number) => {
     const noticeId = ++noticeCounterRef.current
@@ -87,7 +80,7 @@ export default function GameHUD({
     }
     setNotices((prev) => [...prev, pendingNotice])
 
-    const result = await mintTo(walletAddress)
+    const result = await mint()
 
     setNotices((prev) =>
       prev.map((n) =>
@@ -108,11 +101,10 @@ export default function GameHUD({
 
     setTimeout(() => {
       setNotices((prev) => prev.filter((n) => n.id !== noticeId))
-    }, 4000)
+    }, 4500)
   }
 
   const wave = Math.floor(difficulty / 2) + 1
-  const lowBalance = parseFloat(balance) < 0.001
   const pendingCount = notices.filter((n) => n.status === 'pending').length
 
   return (
@@ -156,38 +148,28 @@ export default function GameHUD({
               </p>
             </div>
 
-            {/* Minter status */}
-            <button
-              onClick={() => setDashboardOpen(true)}
-              className={`text-left border px-3 py-2 pointer-events-auto transition-colors ${
-                isConfigured
-                  ? lowBalance
-                    ? 'border-[#7a1515] bg-[#3d0808]/80 animate-pulse'
-                    : 'border-[#a3b83d]/60 bg-[#14100e]/85 hover:bg-[#2a231f]'
-                  : 'border-[#a35124] bg-[#2a231f]/85 animate-pulse'
-              }`}
+            {/* Mint mode indicator — shows whether the player will get
+                silent (embedded) or wallet-prompt (external) tagging. */}
+            <div
+              className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2"
               style={{
                 clipPath:
                   'polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%)',
               }}
             >
               <p
-                className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#8a8270]"
+                className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#a3b83d]"
                 style={displayFont}
               >
-                AMMO RIG
+                TAG MODE
               </p>
               <p
                 className="text-xs text-[#d6ccb2]"
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
-                {isConfigured
-                  ? lowBalance
-                    ? 'LOW FUEL — TAP'
-                    : `${parseFloat(balance).toFixed(4)} ETH`
-                  : 'TAP TO ARM'}
+                {isEmbedded ? 'SILENT' : 'WALLET'}
               </p>
-            </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 items-end">
@@ -199,20 +181,12 @@ export default function GameHUD({
               BAIL OUT
             </button>
             <button
-              onClick={() => setDashboardOpen(true)}
-              className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-xs text-[#d6ccb2] tracking-[0.2em] hover:bg-[#2a231f]"
-              style={displayFont}
-            >
-              STASH
-            </button>
-            <button
               onClick={toggleFullscreen}
               className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-xs text-[#d6ccb2] tracking-[0.2em] hover:bg-[#2a231f] flex items-center gap-2"
               style={displayFont}
               aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
             >
               {isFullscreen ? (
-                // Exit fullscreen icon (inward arrows)
                 <svg
                   width="14"
                   height="14"
@@ -227,7 +201,6 @@ export default function GameHUD({
                   <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
                 </svg>
               ) : (
-                // Enter fullscreen icon (outward corners)
                 <svg
                   width="14"
                   height="14"
@@ -249,7 +222,6 @@ export default function GameHUD({
 
         {/* Bottom HUD — pushed right so it never overlaps the joystick zone */}
         <div className="flex justify-end items-end pointer-events-auto gap-2 pr-1">
-          {/* Wave */}
           <div className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-right min-w-[72px]">
             <p
               className="text-[9px] mb-1 tracking-[0.3em] text-[#a35124]"
@@ -265,7 +237,6 @@ export default function GameHUD({
             </p>
           </div>
 
-          {/* Kills */}
           <div className="border border-[#4a3f38] bg-[#14100e]/85 px-3 py-2 text-right min-w-[72px]">
             <p
               className="text-[9px] mb-1 tracking-[0.3em] text-[#7a1515]"
@@ -281,7 +252,6 @@ export default function GameHUD({
             </p>
           </div>
 
-          {/* NFTs */}
           <div className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2 text-right min-w-[72px]">
             <p
               className="text-[9px] mb-1 tracking-[0.3em] text-[#a3b83d]"
@@ -299,12 +269,13 @@ export default function GameHUD({
         </div>
       </div>
 
-      {/* Mint Notifications */}
+      {/* Mint Notifications — pending / success / failed shown next to
+          the kill so the player sees tagging happen in real time. */}
       <div className="absolute top-28 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col gap-2 z-30 items-center">
         {notices.map((notice) => (
           <div
             key={notice.id}
-            className={`px-4 py-2 border-2 shadow-lg transition-all ${
+            className={`px-4 py-2 border-2 shadow-lg transition-all max-w-[280px] ${
               notice.status === 'pending'
                 ? 'bg-[#2a231f] border-[#a35124]'
                 : notice.status === 'success'
@@ -326,14 +297,19 @@ export default function GameHUD({
                   className="text-xs text-[#a3b83d] tracking-[0.15em]"
                   style={displayFont}
                 >
-                  TAG CONFIRMED
+                  TAG CONFIRMED · KILL #{notice.kill}
                 </p>
-                <p
-                  className="text-[10px] text-[#8a8270] mt-0.5"
-                  style={{ fontFamily: 'var(--font-mono)' }}
-                >
-                  {notice.hash?.slice(0, 10)}...{notice.hash?.slice(-6)}
-                </p>
+                {notice.hash && (
+                  <a
+                    href={`https://basescan.org/tx/${notice.hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-[#8a8270] mt-0.5 underline pointer-events-auto block"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {notice.hash.slice(0, 10)}...{notice.hash.slice(-6)}
+                  </a>
+                )}
               </>
             )}
             {notice.status === 'failed' && (
@@ -342,10 +318,10 @@ export default function GameHUD({
                   className="text-xs text-[#d6ccb2] tracking-[0.15em]"
                   style={displayFont}
                 >
-                  TAG LOST
+                  TAG LOST · KILL #{notice.kill}
                 </p>
                 <p
-                  className="text-[10px] text-[#d6ccb2]/80 mt-0.5 max-w-[220px] truncate"
+                  className="text-[10px] text-[#d6ccb2]/80 mt-0.5 leading-snug"
                   style={bodyFont}
                 >
                   {notice.error}
@@ -367,12 +343,6 @@ export default function GameHUD({
           </p>
         </div>
       )}
-
-      <MintingDashboard
-        open={dashboardOpen}
-        onClose={() => setDashboardOpen(false)}
-        privyWalletAddress={walletAddress}
-      />
     </>
   )
 }
