@@ -76,33 +76,35 @@ export default function RootLayoutClient({
     <PrivyProvider
       appId={appId}
       config={{
-        // On mobile browsers, "Sign with your wallet" frequently fails
-        // because (a) popups get blocked, (b) WalletConnect deep-links
-        // time out (especially over a VPN), and (c) there's no injected
-        // wallet to fall back to. Email/Google login does NOT have any
-        // of those failure modes — Privy creates an embedded wallet
-        // for the user automatically, so all the minting/address/
-        // balance code keeps working unchanged. We list email first so
-        // mobile users hit the reliable path by default; wallet stays
-        // available for desktop users with a wallet extension.
-        loginMethods: ['email', 'google', 'wallet'],
+        // Keep wallet as the primary path (it was working originally)
+        // but list email/google as fallback methods that Privy offers
+        // on the same modal. NOTE: each method here MUST also be
+        // enabled in the Privy dashboard (dashboard.privy.io →
+        // Login methods) — if a method is listed here but disabled
+        // there, Privy can throw "Could not log in" without details.
+        loginMethods: ['wallet', 'email', 'google'],
         appearance: {
           theme: 'dark',
           accentColor: '#a3b83d',
-          showWalletLoginFirst: false,
-          walletChainType: 'ethereum-only',
+          showWalletLoginFirst: true,
         },
-        // Auto-create an embedded wallet for users who sign in without
-        // one so they always end up authenticated with a usable address.
+        // Auto-create an embedded wallet for users who sign in via
+        // email/google so they always end up with a usable address.
+        // The installed Privy SDK requires the nested
+        // `embeddedWallets.ethereum.createOnLogin` shape.
         embeddedWallets: {
           ethereum: {
             createOnLogin: 'users-without-wallets',
           },
         },
-        // Match the chain we mint on so signed transactions don't get
-        // rejected for being on the wrong network.
+        // `defaultChain` tells Privy which network to spin embedded
+        // wallets up on. We intentionally do NOT pass `supportedChains`
+        // — restricting it to only Base prevents users whose external
+        // wallet is on a different chain from completing sign-in,
+        // which is the regression that broke wallet login. The mint
+        // code switches to Base at transaction time, so allowing any
+        // chain here is safe.
         defaultChain: base,
-        supportedChains: [base],
       }}
     >
       {children}
