@@ -76,11 +76,21 @@ export default function RootLayoutClient({
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['wallet'],
+        // IMPORTANT: with `wallet`-only Privy still requires a SIWE
+        // signature after the wallet connects — if the user dismisses
+        // that prompt (or it silently fails on mobile in-app browsers)
+        // they end up "connected but not authenticated" and the game
+        // never advances past the login screen. Adding email/Google as
+        // alternative login methods gives users a reliable path that
+        // always completes auth, with an embedded wallet auto-created
+        // for them so the rest of the app (minting, address) keeps
+        // working unchanged.
+        loginMethods: ['wallet', 'email', 'google'],
         appearance: {
           theme: 'dark',
           accentColor: '#a3b83d',
           showWalletLoginFirst: true,
+          walletChainType: 'ethereum-only',
         },
         // Auto-create an embedded wallet for users who sign in without
         // one so they always end up authenticated with a usable address.

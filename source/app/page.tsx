@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePrivy } from '@privy-io/react-auth'
+import { usePrivy, useLogin } from '@privy-io/react-auth'
 import LoginScreen from '@/components/LoginScreen'
 import GameHUD from '@/components/GameHUD'
 import GameOver from '@/components/GameOver'
@@ -13,7 +13,32 @@ export default function Home() {
   // then, `login()` is a no-op and `authenticated`/`user` are stale, so
   // we MUST gate the UI on it — otherwise pressing ENLIST too early
   // does nothing and the wallet never connects.
-  const { ready, authenticated, user, login, logout } = usePrivy()
+  const { ready, authenticated, user, logout } = usePrivy()
+  const [loginError, setLoginError] = useState<string | null>(null)
+
+  // useLogin gives us explicit success/error callbacks so we can detect
+  // the "connected but didn't sign SIWE" case (which is the most common
+  // reason the wallet appears connected but the user never advances
+  // past the login screen) and tell the user what to do about it.
+  const { login } = useLogin({
+    onComplete: ({ user }) => {
+      console.log('[v0] Privy login complete:', user.id)
+      setLoginError(null)
+    },
+    onError: (error) => {
+      console.log('[v0] Privy login error:', error)
+      // Common values: 'exited_auth_flow', 'user_rejected_signature',
+      // 'generic_connect_wallet_error'. Map these to friendly text.
+      const msg = String(error)
+      if (/rejected|denied|exited|cancel/i.test(msg)) {
+        setLoginError(
+          'Sign-in cancelled. Your wallet connected, but you need to APPROVE the signature request to enter the game.',
+        )
+      } else {
+        setLoginError(`Sign-in failed: ${msg}`)
+      }
+    },
+  })
   const [gameState, setGameState] = useState({
     kills: 0,
     difficulty: 0,
@@ -87,7 +112,7 @@ export default function Home() {
   }
 
   if (!authenticated || !user) {
-    return <LoginScreen onLogin={login} />
+    return <LoginScreen onLogin={login} error={loginError} />
   }
 
   const walletAddress = user.wallet?.address || ''
