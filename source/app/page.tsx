@@ -57,6 +57,10 @@ export default function Home() {
     gameOver: false,
     isPaused: false,
   })
+  // Tracks how many dog-tag NFTs were actually minted successfully
+  // this run. Lifted out of GameHUD so the GameOver screen shows the
+  // real count (not score/5, which assumed mint-every-5th-kill).
+  const [nftsMinted, setNftsMinted] = useState(0)
   const [mounted, setMounted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const movementRef = useRef<JoystickVector>({ x: 0, y: 0 })
@@ -104,6 +108,7 @@ export default function Home() {
       gameOver: false,
       isPaused: false,
     })
+    setNftsMinted(0)
   }
 
   if (!mounted) return null
@@ -156,6 +161,8 @@ export default function Home() {
             walletAddress={walletAddress}
             onLogout={logout}
             isPaused={gameState.isPaused}
+            nftsMinted={nftsMinted}
+            onMintSuccess={() => setNftsMinted((prev) => prev + 1)}
           />
         )}
 
@@ -166,6 +173,7 @@ export default function Home() {
         {gameState.gameOver && (
           <GameOver
             score={gameState.kills}
+            nftsMinted={nftsMinted}
             walletAddress={walletAddress}
             onPlayAgain={resetGame}
             onLogout={logout}
