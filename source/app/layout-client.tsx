@@ -100,10 +100,20 @@ export default function RootLayoutClient({
         // (External wallets like MetaMask/Coinbase still show their
         // own native confirmation; that's a wallet security feature
         // and cannot be bypassed by Privy.)
+        // `createOnLogin: 'all-users'` makes Privy provision a brand-new
+        // embedded wallet for EVERY signed-in user — even ones who
+        // connected an external wallet like MetaMask. This is what
+        // makes silent minting actually work universally:
+        // external wallets cannot sign without a popup (security
+        // feature of the wallet itself, not Privy), but the embedded
+        // wallet can. The mint hook routes ALL mints through the
+        // embedded wallet, so the player never sees a confirmation.
+        // The user just funds the embedded wallet (shown in HUD)
+        // once with a tiny amount of Base ETH for gas.
         embeddedWallets: {
           showWalletUIs: false,
           ethereum: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: 'all-users',
           },
         },
         // `defaultChain` tells Privy which network to spin embedded

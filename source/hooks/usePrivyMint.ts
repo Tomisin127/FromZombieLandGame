@@ -1,12 +1,11 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePrivy, useWallets, useSendTransaction } from '@privy-io/react-auth'
 import {
   createPublicClient,
-  createWalletClient,
-  custom,
   encodeFunctionData,
+  formatEther,
   http,
   type Hex,
 } from 'viem'
@@ -121,21 +120,58 @@ export function usePrivyMint() {
   const { wallets } = useWallets()
   const { sendTransaction: privySendTransaction } = useSendTransaction()
 
-  // Pick the first connected wallet. Privy lists embedded wallets first
-  // when they exist, otherwise the externally connected wallet.
-  const wallet = useMemo(() => wallets[0], [wallets])
-  const isEmbedded = wallet?.walletClientType === 'privy'
+  // ALWAYS pick the Privy embedded wallet, regardless of whether the
+  // user also connected an external one. Embedded wallets can sign
+  // silently (with `showWalletUIs:false`), external wallets cannot.
+  // `createOnLogin:'all-users'` in layout-client guarantees this
+  // exists for every signed-in player.
+  const embeddedWallet = useMemo(
+    () => wallets.find((w) => w.walletClientType === 'privy'),
+    [wallets],
+  )
+  // The user's primary identity (might be external if they connected
+  // MetaMask), used only for display in the HUD.
+  const primaryWallet = useMemo(() => wallets[0], [wallets])
 
-  const isAvailable = Boolean(authenticated && wallet)
+  const isAvailable = Boolean(authenticated && embeddedWallet)
+
+  // Track ETH balance of the embedded wallet so the HUD can warn the
+  // user when it's empty (gas comes from this wallet, no sponsorship).
+  const [balance, setBalance] = useState<string>('0')
+  const [balanceWei, setBalanceWei] = useState<bigint>(0n)
+
+  const refreshBalance = useCallback(async () => {
+    if (!embeddedWallet) return
+    try {
+      const wei = await publicClient.getBalance({
+        address: embeddedWallet.address as `0x${string}`,
+      })
+      setBalanceWei(wei)
+      setBalance(parseFloat(formatEther(wei)).toFixed(5))
+    } catch (e) {
+      console.log('[v0] Balance fetch failed:', e)
+    }
+  }, [embeddedWallet])
+
+  // Poll balance lightly so the HUD funding warning clears once the
+  // user tops up the embedded wallet.
+  useEffect(() => {
+    if (!embeddedWallet) return
+    refreshBalance()
+    const id = setInterval(refreshBalance, 15000)
+    return () => clearInterval(id)
+  }, [embeddedWallet, refreshBalance])
 
   const mint = useCallback(async (): Promise<{
     success: boolean
     hash?: string
     error?: string
   }> => {
-    if (!wallet) return { success: false, error: 'No wallet connected' }
+    if (!embeddedWallet) {
+      return { success: false, error: 'No embedded wallet provisioned yet' }
+    }
 
-    const account = wallet.address as `0x${string}`
+    const account = embeddedWallet.address as `0x${string}`
 
     try {
       // Pre-estimate gas with each variant. The first one that estimates
@@ -191,53 +227,29 @@ export function usePrivyMint() {
       })
       const data = (baseData + DATA_SUFFIX.slice(2)) as `0x${string}`
 
-      if (isEmbedded) {
-        // SILENT path — embedded wallet + Privy useSendTransaction with
-        // showWalletUIs:false on the provider config. Returns { hash }.
-        const result = await privySendTransaction(
-          {
-            to: NFT_CONTRACT_ADDRESS,
-            data,
-            chainId: base.id,
-            gasLimit: chosen.gas,
-          },
-          {
-            // Per-call override; also needs the provider-level config
-            // `embeddedWallets.showWalletUIs:false` to fully suppress.
-            uiOptions: { showWalletUIs: false } as any,
-          },
-        )
-        console.log(
-          `[v0] Privy embedded silent mint ok with ${chosen.variant.name}:`,
-          result.hash,
-        )
-        return { success: true, hash: result.hash }
-      }
-
-      // External wallet path — viem custom transport over the wallet's
-      // injected provider. The wallet itself shows its native popup;
-      // there is no way to bypass that and still have the user pay gas.
-      try {
-        await wallet.switchChain(base.id)
-      } catch (e) {
-        console.log('[v0] switchChain failed (continuing):', e)
-      }
-      const provider = await wallet.getEthereumProvider()
-      const walletClient = createWalletClient({
-        account,
-        chain: base,
-        transport: custom(provider),
-      })
-      const hash = await walletClient.sendTransaction({
-        to: NFT_CONTRACT_ADDRESS as `0x${string}`,
-        data,
-        gas: chosen.gas,
-      })
-      console.log(
-        `[v0] External wallet mint ok with ${chosen.variant.name}:`,
-        hash,
+      // ALWAYS the silent embedded-wallet path. We never call the
+      // external wallet's `sendTransaction` because that would force a
+      // user-facing confirmation popup that wallet apps cannot suppress.
+      const result = await privySendTransaction(
+        {
+          to: NFT_CONTRACT_ADDRESS,
+          data,
+          chainId: base.id,
+          gasLimit: chosen.gas,
+        },
+        {
+          // Per-call override; also needs the provider-level config
+          // `embeddedWallets.showWalletUIs:false` to fully suppress UI.
+          uiOptions: { showWalletUIs: false } as any,
+        },
       )
-      return { success: true, hash }
+      console.log(
+        `[v0] Silent embedded mint ok with ${chosen.variant.name}:`,
+        result.hash,
+      )
+      // Refresh balance in the background so the HUD warning clears.
+      refreshBalance()
+      return { success: true, hash: result.hash }
     } catch (err: any) {
       const msg = err?.shortMessage || err?.message || 'Mint failed'
       console.error('[v0] Mint error:', msg, err)
@@ -254,12 +266,17 @@ export function usePrivyMint() {
       }
       return { success: false, error: msg }
     }
-  }, [wallet, isEmbedded, privySendTransaction])
+  }, [embeddedWallet, privySendTransaction, refreshBalance])
 
   return {
     mint,
     isAvailable,
-    address: wallet?.address,
-    isEmbedded,
+    // The wallet that actually signs and pays gas (always embedded).
+    embeddedAddress: embeddedWallet?.address,
+    // The user-facing identity address (might be external wallet).
+    address: primaryWallet?.address,
+    balance,
+    balanceWei,
+    refreshBalance,
   }
 }
