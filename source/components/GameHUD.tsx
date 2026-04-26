@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Settings } from 'lucide-react'
+import { Settings, Copy, Check } from 'lucide-react'
 import { usePrivyMint } from '@/hooks/usePrivyMint'
 import MinterSettings from '@/components/MinterSettings'
 
@@ -50,6 +50,8 @@ export default function GameHUD({
   const [notices, setNotices] = useState<MintNotice[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const processedKillsRef = useRef<Set<number>>(new Set())
   const noticeCounterRef = useRef(0)
 
@@ -171,21 +173,17 @@ export default function GameHUD({
               </p>
             </div>
 
-            {/* Minter — the wallet that signs and pays gas. Which one
-                is depends on the dashboard setting. Tap-to-copy the
-                address so the player can fund it (silent modes need
-                gas to be present in the address itself). */}
+            {/* Minter — the wallet that signs and pays gas. Silent
+                modes (embedded / custom) need gas in this exact
+                address, so we surface a small explicit copy button
+                next to the truncated address for funding. */}
             {activeAddress && (
-              <button
-                onClick={() => {
-                  void navigator.clipboard?.writeText(activeAddress)
-                }}
-                className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2 text-left hover:bg-[#1a1614] transition-colors"
+              <div
+                className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2"
                 style={{
                   clipPath:
                     'polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%)',
                 }}
-                aria-label="Copy minter wallet address"
               >
                 <p
                   className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#a3b83d]"
@@ -193,12 +191,34 @@ export default function GameHUD({
                 >
                   {modeLabel}
                 </p>
-                <p
-                  className="text-xs text-[#d6ccb2]"
-                  style={{ fontFamily: 'var(--font-mono)' }}
-                >
-                  {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p
+                    className="text-xs text-[#d6ccb2]"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
+                    {activeAddress.slice(0, 6)}...{activeAddress.slice(-4)}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(activeAddress)
+                      setCopied(true)
+                      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+                      copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500)
+                    }}
+                    className="border border-[#4a3f38] hover:border-[#a3b83d] text-[#8a8270] hover:text-[#a3b83d] w-5 h-5 flex items-center justify-center transition-colors"
+                    aria-label={
+                      copied ? 'Address copied' : 'Copy minter wallet address to fund it'
+                    }
+                    title={copied ? 'Copied' : 'Copy address'}
+                  >
+                    {copied ? (
+                      <Check className="w-3 h-3" aria-hidden="true" />
+                    ) : (
+                      <Copy className="w-3 h-3" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
                 <p
                   className="text-[10px] mt-1 tracking-[0.2em]"
                   style={{
@@ -208,7 +228,7 @@ export default function GameHUD({
                 >
                   {balance} ETH {balanceWei === 0n ? '· LOW FUEL' : ''}
                 </p>
-              </button>
+              </div>
             )}
           </div>
 
