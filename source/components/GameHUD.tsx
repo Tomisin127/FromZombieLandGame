@@ -28,10 +28,13 @@ export default function GameHUD({
   walletAddress,
   onLogout,
 }: GameHUDProps) {
-  // Mint comes straight from the connected Privy wallet — no separate
-  // dashboard, no imported private key. Gas is paid by the connected
-  // wallet itself.
-  const { mint, isAvailable, isEmbedded } = usePrivyMint()
+  // Mint always runs through the user's Privy embedded wallet — even
+  // if they signed in by connecting MetaMask, Privy provisions a
+  // separate embedded wallet (createOnLogin:'all-users') that can sign
+  // silently with no popup. `embeddedAddress` is where the player
+  // funds gas; `balance` is the live ETH balance on Base.
+  const { mint, isAvailable, embeddedAddress, balance, balanceWei } =
+    usePrivyMint()
   const [nftsMinted, setNftsMinted] = useState(0)
   const [notices, setNotices] = useState<MintNotice[]>([])
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -148,28 +151,45 @@ export default function GameHUD({
               </p>
             </div>
 
-            {/* Mint mode indicator — shows whether the player will get
-                silent (embedded) or wallet-prompt (external) tagging. */}
-            <div
-              className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2"
-              style={{
-                clipPath:
-                  'polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%)',
-              }}
-            >
-              <p
-                className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#a3b83d]"
-                style={displayFont}
+            {/* Minter — the silent embedded Privy wallet that signs
+                every mint and pays gas. The player needs to fund THIS
+                address (a few cents of Base ETH) for tagging to work.
+                Tap-to-copy so they can quickly send funds to it. */}
+            {embeddedAddress && (
+              <button
+                onClick={() => {
+                  void navigator.clipboard?.writeText(embeddedAddress)
+                }}
+                className="border border-[#a3b83d]/50 bg-[#14100e]/85 px-3 py-2 text-left hover:bg-[#1a1614] transition-colors"
+                style={{
+                  clipPath:
+                    'polygon(0 0, 100% 0, 100% 70%, 92% 100%, 0 100%)',
+                }}
+                aria-label="Copy minter wallet address"
               >
-                TAG MODE
-              </p>
-              <p
-                className="text-xs text-[#d6ccb2]"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {isEmbedded ? 'SILENT' : 'WALLET'}
-              </p>
-            </div>
+                <p
+                  className="text-[10px] leading-none mb-1 tracking-[0.25em] text-[#a3b83d]"
+                  style={displayFont}
+                >
+                  MINTER · TAP TO COPY
+                </p>
+                <p
+                  className="text-xs text-[#d6ccb2]"
+                  style={{ fontFamily: 'var(--font-mono)' }}
+                >
+                  {embeddedAddress.slice(0, 6)}...{embeddedAddress.slice(-4)}
+                </p>
+                <p
+                  className="text-[10px] mt-1 tracking-[0.2em]"
+                  style={{
+                    ...displayFont,
+                    color: balanceWei === 0n ? '#7a1515' : '#a3b83d',
+                  }}
+                >
+                  {balance} ETH {balanceWei === 0n ? '· LOW FUEL' : ''}
+                </p>
+              </button>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 items-end">

@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   title: 'Zombie FPS Game',
   description: 'Play and earn with blockchain FPS gameplay',
   generator: 'v0.app',
+  // Base Mini App attribution — links this app to its Base app id so
+  // mints made from the game count toward the Base app's stats.
+  other: {
+    'base:app_id': '69ea74e2269d5b14147c9057',
+  },
   icons: {
     icon: [
       {
