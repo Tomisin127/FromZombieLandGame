@@ -61,7 +61,10 @@ export const metadata: Metadata = {
     type: 'website',
   },
   other: {
-    // Base App / Farcaster Mini App embed (current spec)
+    // Base App ID — base.dev reads this to identify the app. Without it you
+    // get "App ID not found in meta tag" when submitting on dashboard.base.org.
+    'base:app_id': '69ea74e2269d5b14147c9057',
+    // Farcaster / Base App in-feed embed (current spec)
     'fc:miniapp': JSON.stringify(miniappEmbed),
     // Backwards-compat: older clients still read fc:frame
     'fc:frame': JSON.stringify(miniappEmbed),
