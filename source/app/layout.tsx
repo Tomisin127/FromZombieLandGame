@@ -30,23 +30,6 @@ const ROOT_URL =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : 'http://localhost:3000')
 
-// Base App / Farcaster embed metadata. dashboard.base.org reads this tag
-// when you submit your URL — without it you get "web resource must have metadata".
-const miniappEmbed = {
-  version: '1',
-  imageUrl: `${ROOT_URL}/hero.png`,
-  button: {
-    title: 'Play Zombie FPS',
-    action: {
-      type: 'launch_miniapp',
-      name: 'Zombie FPS Game',
-      url: ROOT_URL,
-      splashImageUrl: `${ROOT_URL}/splash.png`,
-      splashBackgroundColor: '#12100e',
-    },
-  },
-}
-
 export const metadata: Metadata = {
   metadataBase: new URL(ROOT_URL),
   title: 'Zombie FPS Game',
@@ -61,13 +44,11 @@ export const metadata: Metadata = {
     type: 'website',
   },
   other: {
-    // Base App ID — base.dev reads this to identify the app. Without it you
-    // get "App ID not found in meta tag" when submitting on dashboard.base.org.
+    // Base App ID — dashboard.base.org reads this exact meta tag to verify
+    // ownership and register the app. Per the April 2026 Base migration,
+    // this is the ONLY tag base.dev needs from the site itself; the legacy
+    // fc:miniapp / farcaster.json manifest are no longer used.
     'base:app_id': '69ea74e2269d5b14147c9057',
-    // Farcaster / Base App in-feed embed (current spec)
-    'fc:miniapp': JSON.stringify(miniappEmbed),
-    // Backwards-compat: older clients still read fc:frame
-    'fc:frame': JSON.stringify(miniappEmbed),
   },
   icons: {
     icon: [
