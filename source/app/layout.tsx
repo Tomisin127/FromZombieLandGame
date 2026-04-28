@@ -50,22 +50,16 @@ export const metadata: Metadata = {
     // fc:miniapp / farcaster.json manifest are no longer used.
     'base:app_id': '69ea74e2269d5b14147c9057',
   },
+  // All icon paths point to assets that actually exist in /public.
+  // base.dev's scraper attempts to load these — when they 404 it reports
+  // "web resource must have metadata", because from its perspective the
+  // app card has no usable icon/preview to render.
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: '/apple-icon.png',
+    apple: '/icon.png',
   },
 }
 
