@@ -21,14 +21,50 @@ const geistMono = Geist_Mono({
   variable: '--font-mono',
 })
 
+// Public URL of the deployed app. Set NEXT_PUBLIC_URL in your Vercel project
+// (e.g. https://your-app.vercel.app or your custom domain). Falls back to the
+// Vercel-provided production URL during build.
+const ROOT_URL =
+  process.env.NEXT_PUBLIC_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : 'http://localhost:3000')
+
+// Base App / Farcaster embed metadata. dashboard.base.org reads this tag
+// when you submit your URL — without it you get "web resource must have metadata".
+const miniappEmbed = {
+  version: '1',
+  imageUrl: `${ROOT_URL}/hero.png`,
+  button: {
+    title: 'Play Zombie FPS',
+    action: {
+      type: 'launch_miniapp',
+      name: 'Zombie FPS Game',
+      url: ROOT_URL,
+      splashImageUrl: `${ROOT_URL}/splash.png`,
+      splashBackgroundColor: '#12100e',
+    },
+  },
+}
+
 export const metadata: Metadata = {
+  metadataBase: new URL(ROOT_URL),
   title: 'Zombie FPS Game',
   description: 'Play and earn with blockchain FPS gameplay',
   generator: 'v0.app',
-  // Base Mini App attribution — links this app to its Base app id so
-  // mints made from the game count toward the Base app's stats.
+  openGraph: {
+    title: 'Zombie FPS Game',
+    description: 'Play and earn with blockchain FPS gameplay',
+    url: ROOT_URL,
+    siteName: 'Zombie FPS Game',
+    images: [{ url: `${ROOT_URL}/hero.png`, width: 1200, height: 630 }],
+    type: 'website',
+  },
   other: {
-    'base:app_id': '69ea74e2269d5b14147c9057',
+    // Base App / Farcaster Mini App embed (current spec)
+    'fc:miniapp': JSON.stringify(miniappEmbed),
+    // Backwards-compat: older clients still read fc:frame
+    'fc:frame': JSON.stringify(miniappEmbed),
   },
   icons: {
     icon: [
