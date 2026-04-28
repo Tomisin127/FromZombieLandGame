@@ -85,6 +85,20 @@ export default function RootLayout({
       lang="en"
       className={`bg-[#12100e] ${blackOps.variable} ${specialElite.variable} ${geistMono.variable}`}
     >
+      <head>
+        {/*
+          base.dev / dashboard.base.org reads this exact meta tag to verify
+          ownership of the app. We intentionally render it as a literal JSX
+          tag in <head> (in addition to also declaring it via the Metadata
+          API in `metadata.other` above) so it is GUARANTEED to appear in
+          the initial server-rendered HTML before any next/font, viewport,
+          or analytics tags. base.dev's scraper has been observed to miss
+          tags that are synthesized later in the head, so this belt-and-
+          suspenders placement is the most reliable fix for the
+          "web resource must have metadata" error.
+        */}
+        <meta name="base:app_id" content="69ea74e2269d5b14147c9057" />
+      </head>
       <body className="font-sans antialiased bg-[#12100e] text-[#d6ccb2]">
         <RootLayoutClient>
           {children}
