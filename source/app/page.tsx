@@ -64,10 +64,36 @@ export default function Home() {
   const [mounted, setMounted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const movementRef = useRef<JoystickVector>({ x: 0, y: 0 })
+  // Background theme song. Plays as soon as the player is past the
+  // login screen (which is the first guaranteed user gesture, so
+  // `audio.play()` won't be blocked by the autoplay policy). Loops
+  // for continuous ambience.
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Kick the theme song off the moment the player authenticates.
+  // We also wire a one-time click fallback in case the browser still
+  // refuses (e.g. some embedded webviews are stricter than Chrome).
+  useEffect(() => {
+    if (!authenticated) return
+    const el = audioRef.current
+    if (!el) return
+    el.volume = 0.45
+    const tryPlay = () => {
+      el.play().catch((err) => {
+        console.log('[v0] Theme autoplay blocked, will retry on next click:', err)
+        const retry = () => {
+          el.play().catch(() => {})
+          window.removeEventListener('pointerdown', retry)
+        }
+        window.addEventListener('pointerdown', retry, { once: true })
+      })
+    }
+    tryPlay()
+  }, [authenticated])
 
   // Sync fullscreen state with the browser's actual fullscreen element so
   // the wrapper expands/contracts whether fullscreen was triggered by a
@@ -136,6 +162,15 @@ export default function Home() {
 
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden">
+      {/* Theme song — looped background ambience. Hidden from the DOM
+          tree visually; controlled imperatively via audioRef. */}
+      <audio
+        ref={audioRef}
+        src="/zombie-theme.mp3"
+        loop
+        preload="auto"
+        aria-hidden="true"
+      />
       {/* In fullscreen, drop the mobile-portrait max-w so the game fills
           the entire screen on tablets/desktops. */}
       <div
@@ -163,7 +198,41 @@ export default function Home() {
             isPaused={gameState.isPaused}
             nftsMinted={nftsMinted}
             onMintSuccess={() => setNftsMinted((prev) => prev + 1)}
+            // The connected-wallet mint path requires the player to
+            // approve a signature in their wallet. While they're
+            // doing that we freeze the world so they don't take damage
+            // from offscreen zombies.
+            onPauseChange={(paused) =>
+              setGameState((prev) => ({ ...prev, isPaused: paused }))
+            }
           />
+        )}
+
+        {/* Signing overlay — when the player has chosen "connected
+            wallet" mode, every kill triggers a wallet popup. We pause
+            the game and tell them what to do so they aren't ambushed
+            while signing. */}
+        {gameState.isPaused && !gameState.gameOver && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 pointer-events-none">
+            <div
+              className="border-2 border-[#a3b83d] bg-[#14100e]/95 px-6 py-5 text-center max-w-xs"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              <p className="text-[10px] tracking-[0.4em] text-[#a3b83d] mb-2">
+                GAME PAUSED
+              </p>
+              <p className="text-sm tracking-[0.2em] text-[#d6ccb2] mb-2">
+                APPROVE THE TAG
+              </p>
+              <p
+                className="text-[11px] text-[#8a8270] leading-relaxed tracking-wider"
+                style={{ fontFamily: 'var(--font-body)' }}
+              >
+                Sign the transaction in your wallet to log this kill on Base.
+                The hunt resumes the moment you confirm.
+              </p>
+            </div>
+          </div>
         )}
 
         {/* Movement Joystick (bottom-left) */}
