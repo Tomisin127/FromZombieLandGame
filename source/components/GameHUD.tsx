@@ -15,6 +15,10 @@ interface GameHUDProps {
   // number of dog-tags minted this run.
   nftsMinted: number
   onMintSuccess: () => void
+  // Called with `true` while the player is signing a transaction in
+  // their connected wallet (so the parent can freeze the game), and
+  // `false` once the signature flow finishes (success or reject).
+  onPauseChange?: (paused: boolean) => void
 }
 
 interface MintNotice {
@@ -35,7 +39,12 @@ export default function GameHUD({
   onLogout,
   nftsMinted,
   onMintSuccess,
+  onPauseChange,
 }: GameHUDProps) {
+  // True while we're awaiting the player's signature in their connected
+  // wallet. Used to render a "WAITING FOR SIGNATURE" overlay so the
+  // player understands why the action paused.
+  const [isSigning, setIsSigning] = useState(false)
   // The active mint mode is selected by the player on the dashboard
   // (silent embedded / connected wallet / pasted private key). The
   // hook resolves which address actually signs and pays gas.
@@ -105,7 +114,23 @@ export default function GameHUD({
     }
     setNotices((prev) => [...prev, pendingNotice])
 
+    // Connected-wallet mode pops the wallet's native signature prompt
+    // (Metamask / Coinbase / Rainbow / WalletConnect) — there is no
+    // SDK trick to suppress it. Pause the game world while the player
+    // is signing so they don't take damage during the prompt, then
+    // resume regardless of success/reject.
+    const shouldPauseForSig = activeMode === 'connected'
+    if (shouldPauseForSig) {
+      setIsSigning(true)
+      onPauseChange?.(true)
+    }
+
     const result = await mint()
+
+    if (shouldPauseForSig) {
+      setIsSigning(false)
+      onPauseChange?.(false)
+    }
 
     setNotices((prev) =>
       prev.map((n) =>
@@ -410,6 +435,42 @@ export default function GameHUD({
           <p className="text-[10px] text-[#14100e] tracking-[0.2em]">
             {pendingCount} TAG{pendingCount > 1 ? 'S' : ''} PENDING
           </p>
+        </div>
+      )}
+
+      {/* Signature pause overlay — shown only while the connected wallet
+          is awaiting the player's approval. Acts as a soft pause
+          curtain so the player sees the game is intentionally
+          frozen. */}
+      {isSigning && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 bg-[#14100e]/75" />
+          <div
+            className="relative border-2 border-[#a3b83d] bg-[#14100e]/95 px-6 py-5 max-w-[300px] text-center pointer-events-auto"
+            style={{
+              clipPath:
+                'polygon(0 0, 100% 0, 100% 88%, 92% 100%, 8% 100%, 0 88%)',
+            }}
+          >
+            <p
+              className="text-[10px] tracking-[0.4em] text-[#a3b83d] mb-2"
+              style={displayFont}
+            >
+              SIGNATURE REQUIRED
+            </p>
+            <p
+              className="text-base text-[#d6ccb2] tracking-[0.15em] mb-3 animate-pulse"
+              style={displayFont}
+            >
+              GAME PAUSED
+            </p>
+            <p
+              className="text-[11px] text-[#d6ccb2]/80 leading-relaxed"
+              style={bodyFont}
+            >
+              Approve the transaction in your connected wallet to tag this kill. The world will resume the moment you sign or reject.
+            </p>
+          </div>
         </div>
       )}
 
