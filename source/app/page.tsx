@@ -208,33 +208,6 @@ export default function Home() {
           />
         )}
 
-        {/* Signing overlay — when the player has chosen "connected
-            wallet" mode, every kill triggers a wallet popup. We pause
-            the game and tell them what to do so they aren't ambushed
-            while signing. */}
-        {gameState.isPaused && !gameState.gameOver && (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 pointer-events-none">
-            <div
-              className="border-2 border-[#a3b83d] bg-[#14100e]/95 px-6 py-5 text-center max-w-xs"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              <p className="text-[10px] tracking-[0.4em] text-[#a3b83d] mb-2">
-                GAME PAUSED
-              </p>
-              <p className="text-sm tracking-[0.2em] text-[#d6ccb2] mb-2">
-                APPROVE THE TAG
-              </p>
-              <p
-                className="text-[11px] text-[#8a8270] leading-relaxed tracking-wider"
-                style={{ fontFamily: 'var(--font-body)' }}
-              >
-                Sign the transaction in your wallet to log this kill on Base.
-                The hunt resumes the moment you confirm.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Movement Joystick (bottom-left) */}
         {!gameState.gameOver && <Joystick movementRef={movementRef} />}
 
