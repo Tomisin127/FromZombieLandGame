@@ -16,6 +16,7 @@ import { base } from 'viem/chains'
 import { Attribution } from 'ox/erc8021'
 import { NFT_CONTRACT_ADDRESS, BUILDER_CODE } from '@/lib/contract'
 import { loadMintSettings, type MintMode, type MintSettings } from '@/lib/mintSettings'
+import { withManagedNonce, resetManagedNonce } from '@/lib/nonceManager'
 
 // ERC-8021 attribution suffix appended to every mint's calldata.
 const DATA_SUFFIX = Attribution.toDataSuffix({ codes: [BUILDER_CODE] }) as Hex
@@ -229,6 +230,15 @@ export function usePrivyMint() {
     return () => clearInterval(id)
   }, [activeAddress, refreshBalance])
 
+  // Reset the local nonce cache whenever the custom signing address
+  // changes (e.g. user pasted a different private key). Otherwise the
+  // counter from the previous key would be applied to the new one.
+  useEffect(() => {
+    if (customAccount?.address) {
+      resetManagedNonce(customAccount.address)
+    }
+  }, [customAccount?.address])
+
   const mint = useCallback(async (): Promise<{
     success: boolean
     hash?: string
@@ -292,16 +302,28 @@ export function usePrivyMint() {
       if (activeMode === 'custom' && customAccount) {
         // Silent: viem walletClient backed by the pasted private key.
         // Pays gas from customAccount.address. No external popup.
+        //
+        // Rapid back-to-back kills would otherwise collide on the same
+        // nonce (viem fetches `getTransactionCount` per send and gets
+        // the same answer until txs are mined). The nonce manager
+        // serializes sends and assigns a monotonically increasing
+        // nonce so every kill mints, even at machine-gun speed.
         const walletClient = createWalletClient({
           account: customAccount,
           chain: base,
           transport: http(),
         })
-        const hash = await walletClient.sendTransaction({
-          to: NFT_CONTRACT_ADDRESS as `0x${string}`,
-          data,
-          gas: chosen.gas,
-        })
+        const hash = await withManagedNonce(
+          customAccount.address,
+          publicClient,
+          (nonce) =>
+            walletClient.sendTransaction({
+              to: NFT_CONTRACT_ADDRESS as `0x${string}`,
+              data,
+              gas: chosen.gas,
+              nonce,
+            }),
+        )
         console.log(
           `[v0] Custom-key silent mint ok with ${chosen.variant.name}:`,
           hash,
