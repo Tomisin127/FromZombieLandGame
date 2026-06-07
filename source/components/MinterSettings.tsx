@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { privateKeyToAccount } from 'viem/accounts'
+import { usePrivy, useWallets, useExportWallet } from '@privy-io/react-auth'
 import {
   loadMintSettings,
   saveMintSettings,
@@ -27,6 +28,33 @@ export default function MinterSettings({ open, onClose, onSaved }: MinterSetting
   const [derivedAddress, setDerivedAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [savedFlash, setSavedFlash] = useState(false)
+
+  // Privy embedded-wallet export. `exportWallet` opens Privy's own secure
+  // modal where the user can reveal/copy their private key — the key never
+  // passes through this game's code. We only need the embedded wallet's
+  // address to target the right wallet and to know whether export is even
+  // possible yet.
+  const { authenticated } = usePrivy()
+  const { wallets } = useWallets()
+  const { exportWallet } = useExportWallet()
+  const embeddedWallet = wallets.find((w) => w.walletClientType === 'privy')
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    if (!embeddedWallet) return
+    setError(null)
+    setExporting(true)
+    try {
+      await exportWallet({ address: embeddedWallet.address })
+    } catch (err) {
+      console.log('[v0] Export wallet failed:', err)
+      setError(
+        'Could not open the key export window. Make sure you are signed in with your embedded wallet and try again.',
+      )
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // Load whatever's currently saved when the modal opens so the form
   // reflects the active configuration.
@@ -206,6 +234,55 @@ export default function MinterSettings({ open, onClose, onSaved }: MinterSetting
             </p>
           </div>
         )}
+
+        {/* Export embedded wallet key — lets the player take custody of the
+            auto-created Privy wallet by revealing its private key in Privy's
+            own secure modal. Only meaningful once signed in and an embedded
+            wallet exists. */}
+        <div className="border border-[#4a3f38] bg-[#1a1614] p-3 mb-5">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p
+              className="text-[10px] text-[#a3b83d] tracking-[0.3em]"
+              style={displayFont}
+            >
+              EXPORT EMBEDDED KEY
+            </p>
+            <span
+              className="text-[9px] tracking-[0.2em] px-2 py-0.5 border border-[#a35124]/60 text-[#a35124]"
+              style={displayFont}
+            >
+              SELF-CUSTODY
+            </span>
+          </div>
+          <p className="text-[11px] text-[#8a8270] leading-relaxed mb-3" style={bodyFont}>
+            {
+              'Reveal the private key of your auto-created Privy wallet so you can import it into MetaMask or any other wallet. The key is shown only inside Privy\u2019s secure window \u2014 it never touches this game.'
+            }
+          </p>
+          {embeddedWallet && (
+            <p className="text-[11px] text-[#a3b83d] mb-3 break-all" style={monoFont}>
+              {embeddedWallet.address}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={!authenticated || !embeddedWallet || exporting}
+            className="w-full border-2 border-[#a3b83d] bg-[#14100e] text-[#a3b83d] hover:bg-[#a3b83d] hover:text-[#14100e] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#14100e] disabled:hover:text-[#a3b83d] py-2.5 text-xs tracking-[0.2em]"
+            style={displayFont}
+          >
+            {exporting
+              ? 'OPENING\u2026'
+              : !authenticated
+                ? 'SIGN IN TO EXPORT'
+                : !embeddedWallet
+                  ? 'NO EMBEDDED WALLET'
+                  : 'EXPORT PRIVATE KEY'}
+          </button>
+          <p className="text-[10px] text-[#a35124] mt-2 leading-snug" style={bodyFont}>
+            Anyone with this key controls the wallet and its funds. Never share it.
+          </p>
+        </div>
 
         {error && (
           <div
